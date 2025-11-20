@@ -20,6 +20,7 @@ from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 from nav_msgs.msg import OccupancyGrid
 from jmu_ros2_util import map_utils
 import tf_transformations
+from collections import deque
 
 
 import numpy as np
@@ -30,10 +31,38 @@ class Point:
         self.x = x
         self.y = y
 
+class Stack:
+    def __init__(self):
+        # Initialize an empty deque
+        self.stack = deque()
+
+    def push(self, item):
+        """Push an item onto the stack."""
+        self.stack.append(item)  # O(1) operation
+
+    def pop(self):
+        """Pop the top item from the stack."""
+        if self.is_empty():
+            raise IndexError("Pop from empty stack")
+        return self.stack.pop()  # O(1) operation
+
+    def peek(self):
+        """Return the top item without removing it."""
+        if self.is_empty():
+            raise IndexError("Peek from empty stack")
+        return self.stack[-1]
+
+    def is_empty(self):
+        """Check if the stack is empty."""
+        return len(self.stack) == 0
+
+    def size(self):
+        """Return the number of items in the stack."""
+        return len(self.stack)
+
 
 class TempNode(rclpy.node.Node):
 
-    priority_point_value = 1000
 
 
     def __init__(self):
@@ -43,10 +72,9 @@ class TempNode(rclpy.node.Node):
         self.goal_future = None # future for current goal
         self.cancel_future = None # future for goal cancellation
         self.victims = [] # list of victims found
-        self.path = [] # list of points to travel to. When empty it draws from points (Use linked list)
-        self.points = [] # store points in list
+        self.path = [] # stack of points to travel to. When empty it draws from points (Use linked list)
+        self.points = Stack() # store points in list
         self.point_index = 0 # index for current point in points list
-        self.target_point = None # current target point for pathfinding
         self.goal = None # current navigation goal for action client
         self.timeout = 60.0  # 60 seconds timeout per goal
         self.future_event = None
@@ -64,8 +92,8 @@ class TempNode(rclpy.node.Node):
 
         # Create timers for periodic checks
         self.create_timer(.1, self.goal_checker_callback)
-        self.create_timer(1.0, self.path_planning_callback)
-        self.create_timer(1.0, self.check_for_detours)
+        self.create_timer(.1, self.fill_path_and_points_callback)
+        self.create_timer(.1, self.check_for_detours)
 
 
 
@@ -83,6 +111,10 @@ class TempNode(rclpy.node.Node):
     def goal_checker_callback(self):
 
         """Periodically check in on the progress of navigation."""
+        if self.goal_future is None:
+            self.navigate_to_target(self.path[self.point_index])
+            self.point_index += 1
+            return  # No goal has been sent yet.
 
         if not self.goal_future.done():
             self.get_logger().info("NAVIGATION GOAL NOT YET ACCEPTED")
@@ -112,16 +144,22 @@ class TempNode(rclpy.node.Node):
                 self.get_logger().info("TAKING TOO LONG. CANCELLING GOAL!")
                 self.cancel_future = self.goal_future.result().cancel_goal_async()
 
-    def path_planning_callback(self):
+    def fill_path_and_points_callback(self):
         """Periodically check and plan path if needed."""
         if self.map is None: # Cannot plan without a map
             self.get_logger().info("No map available for path planning.")
             return
 
-        if self.points.length == 0:
+        if len(self.points) == 0: # No points currently available
             self.get_logger().info("Generating new points.")
             self.find_random_valid_points(number_of_nodes=50)
             return
+
+        if len(self.path) == 0: # No current path, need to plan
+            self.get_logger().info("Planning new path.")
+            self.path.push(self.points[self.point_index])
+            return
+
 
     def check_for_detours(self):
         """Check if there are better points to navigate to en route to current target."""
@@ -166,6 +204,7 @@ class TempNode(rclpy.node.Node):
             if val == 0:
                 points.append(Point(value=0, x=x, y=y))
             self.node_value(points)
+            self.points = points
 
         return points
 
