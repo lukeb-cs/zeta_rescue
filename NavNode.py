@@ -31,6 +31,9 @@ class Point:
         self.x = x
         self.y = y
 
+    def equals(self, other):
+        return self.x == other.x and self.y == other.y
+
 class Stack:
     def __init__(self):
         # Initialize an empty deque
@@ -60,6 +63,13 @@ class Stack:
         """Return the number of items in the stack."""
         return len(self.stack)
 
+    def remove(self, item):
+        """Remove a specific item from the stack."""
+        try:
+            self.stack.remove(item)
+        except ValueError:
+            raise ValueError("Item not found in stack")
+
 
 class TempNode(rclpy.node.Node):
 
@@ -72,7 +82,7 @@ class TempNode(rclpy.node.Node):
         self.goal_future = None # future for current goal
         self.cancel_future = None # future for goal cancellation
         self.victims = [] # list of victims found
-        self.path = [] # stack of points to travel to. When empty it draws from points (Use linked list)
+        self.path = Stack() # stack of points to travel to. When empty it draws from points (Use linked list)
         self.points = Stack() # store points in list
         self.point_index = 0 # index for current point in points list
         self.goal = None # current navigation goal for action client
@@ -112,7 +122,7 @@ class TempNode(rclpy.node.Node):
 
         """Periodically check in on the progress of navigation."""
         if self.goal_future is None:
-            self.navigate_to_target(self.path[self.point_index])
+            self.navigate_to_target(self.path.peek())
             self.point_index += 1
             return  # No goal has been sent yet.
 
@@ -128,15 +138,13 @@ class TempNode(rclpy.node.Node):
 
             if self.goal_future.result().status == GoalStatus.STATUS_SUCCEEDED:
                 self.get_logger().info("NAVIGATION SERVER REPORTS SUCCESS. EXITING!")
-                self.path[self.point_index] = None
-                self.point_index += 1
+                self.path.pop()
                 self.ac.destroy()
                 self.future_event.set_result(True)
 
             if self.goal_future.result().status == GoalStatus.STATUS_ABORTED:
                 self.get_logger().info("NAVIGATION SERVER HAS ABORTED. EXITING!")
-                self.path[self.point_index] = None
-                self.point_index += 1
+                self.path.pop()
                 self.ac.destroy()
                 self.future_event.set_result(False)
 
@@ -145,19 +153,19 @@ class TempNode(rclpy.node.Node):
                 self.cancel_future = self.goal_future.result().cancel_goal_async()
 
     def fill_path_and_points_callback(self):
-        """Periodically check and plan path if needed."""
+        """Periodically check and add new points."""
         if self.map is None: # Cannot plan without a map
             self.get_logger().info("No map available for path planning.")
             return
 
-        if len(self.points) == 0: # No points currently available
+        if self.points.is_empty(): # No points currently available
             self.get_logger().info("Generating new points.")
             self.find_random_valid_points(number_of_nodes=50)
             return
 
-        if len(self.path) == 0: # No current path, need to plan
+        if self.path.is_empty(): # No current path, need to plan
             self.get_logger().info("Planning new path.")
-            self.path.push(self.points[self.point_index])
+            self.path.push(self.points.pop())
             return
 
 
@@ -165,16 +173,18 @@ class TempNode(rclpy.node.Node):
         """Check if there are better points to navigate to en route to current target."""
         if not self.points or len(self.points) < 2:
             return  # Not enough points to check for detours
-        target_point = self.points.pop()
+        target_point = self.points.peek()
 
         current_position = self.get_current_position() # Placeholder for getting current position
         for point in self.points:
+            if point.equals(target_point):
+                continue  # Skip the target point itself
             distance_to_next = math.hypot(current_position.x - point.x, current_position.y - point.y)
             distance_to_target = math.hypot(current_position.x - target_point.x, current_position.y - target_point.y)
 
-            if point.value == self.priority_point_value or distance_to_next < distance_to_target / 2.0 and point.value / self.start_time > 5:  # Detour threshold and value threshold change to parameters
+            if point.value == self.priority_point_value or (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
                 self.get_logger().info(f"Detour detected to point ({point.x}, {point.y})")
-                self.path.insert(point) # change to stack stuff
+                self.path.push(point) # change to stack stuff
                 self.chart_path_to_target(point) # change
                 break
 
@@ -204,9 +214,8 @@ class TempNode(rclpy.node.Node):
             if val == 0:
                 points.append(Point(value=0, x=x, y=y))
             self.node_value(points)
-            self.points = points
-
-        return points
+            for p in points:
+                self.points.push(p)
 
 
 
@@ -272,21 +281,18 @@ class TempNode(rclpy.node.Node):
 
 
     def navigate_to_target(self, target_point):
-        # Placeholder for navigation logic
+        # Cancel existing goal if present
+
+        if self.goal_future is not None:
+            self.get_logger().info("Cancelling existing goal before sending new one.")
+            self.cancel_future = self.goal_future.result().cancel_goal_async()
+
+        # Create and send new goal
+
         self.goal = self.create_nav_goal(target_point, 0.0)
         self.ac.wait_for_server()
         self.start_time = time.time()
         self.goal_future = self.ac.send_goal_async(self.goal)
-
-
-    def map_movement_planning(self):
-        if self.map is not None:
-            points = self.find_random_valid_points(number_of_nodes=50, map_msg=self.map)
-            self.add_to_points(points)
-            current_target = self.points[0] # change
-            self.chart_path_to_target(current_target)
-
-
 
 
 
@@ -304,8 +310,6 @@ if __name__ == "__main__":
 
 # Set up canceling movements
 # How to get current position
-# implement stack of points stored in path
-# Have detour detection in a callback
 # Have path navigation handled in time callback
 # Recalculate path when new priority target is added
 # When victim found change map to say occupied so it is not revisited
