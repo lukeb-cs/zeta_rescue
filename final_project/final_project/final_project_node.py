@@ -50,7 +50,10 @@ class ZetaNode(rclpy.node.Node):
             # or you can move along the y-axis until the y is the same as the person
         # turn towards the person once the x or y is the same
         # make sure you can still see the aruco code
-        # move within a meter of the person and take a picture where the same is visible
+        # move within a meter of the person and take a picture where the name is visible
+            # (optional) you could using orange detection to prevent the bot from getting too close, but that may not be needed
+            # if we are on the side of the robot where there is no code, move around the person until the code is found
+            # remember that is the aruco is found, its on one of the sides facing the robot, so we only need to check those sides
         # retrace steps, so that you end back on the random path
 
     def image_helper(self, img):
