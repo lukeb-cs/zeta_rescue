@@ -41,6 +41,18 @@ class ZetaNode(rclpy.node.Node):
         self.get_logger().info("Aruco is running the callback")
         self.get_logger().info(f"Poses: {poses}")
 
+        # using the distance and agle, with trig functions, get the x and y position from the robots frame
+        # take the pose you were given and change it to be in the world frame
+        # normalize the world frame coords to remove small variance in points
+        # make a data structure, probably a list of objects to store all people locations in world frame coords
+        # decide if you can move, so that the robot is faceing the person
+            # either move along the x axi-s until difference in x is zero (check if possible)
+            # or you can move along the y-axis until the y is the same as the person
+        # turn towards the person once the x or y is the same
+        # make sure you can still see the aruco code
+        # move within a meter of the person and take a picture where the same is visible
+        # retrace steps, so that you end back on the random path
+
     def image_helper(self, img):
         r = img[:, :, 2].astype(np.float32)
         g = img[:, :, 1].astype(np.float32)
