@@ -10,11 +10,13 @@ import random
 import math
 
 # Message types
-from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import TwistStamped
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import PointStamped
+from sensor_msgs.msg import Image
+from nav_msgs.msg import Odometry
 
 class Person:
     def __init__(self, x, y):
@@ -31,6 +33,7 @@ class ZetaNode(rclpy.node.Node):
         self.subscription_pos = self.create_subscription(Odometry, "/odom", self.pos_callback, 10)
 
         self.thrust_pub = self.create_publisher(TwistStamped, 'cmd_vel', 10)
+        self.nav_point_pub = self.create_publisher(PointStamped, 'nav_point', 10)
 
         self.timer = self.create_timer(1.0, self.change_motion_callback)
 
@@ -73,16 +76,17 @@ class ZetaNode(rclpy.node.Node):
         self.get_logger().info("Aruco is running the callback")
         self.get_logger().info(f"Poses: {poses}")
 
-        angle = 0 # placeholder
+        angle_from_bot = 0 # placeholder
+        angle_of_person = 0 # placeholder
         distance = 1 # placeholder
-        scanning_code = True
+        self.scanning_code = True
 
         # using the distance and angle, with trig functions, get the x and y position
-        x_dist = length * math.cos(math.radians(angle_deg))
-        y_dist = length * math.sin(math.radians(angle_deg))
+        x_dist = distance * math.cos(math.radians(angle_from_bot))
+        y_dist = distance * math.sin(math.radians(angle_from_bot))
         x_loc = x_dist + self.x
         y_loc = y_dist + self.y
-        
+
         # normalize the coords to remove small variance in points
             # if the value is close to that of something we've already scanned, set scanning_code = False and return
         person = Person(x_loc, y_loc)
@@ -92,23 +96,15 @@ class ZetaNode(rclpy.node.Node):
                 return
         self.person_list.append(person)
 
-        # store the robot's starting location
-        stating_x = self.x
-        starting_y = self.y
+        change = 0.5 # 0.5 meters
+        msg = PointStamped()
 
-        # make sure the robot rotates to travel parallel to the person
+        msg.point.x = change * math.sin(angle_of_person)
+        msg.point.y = change * math.cos(angle_of_person)
+        msg.point.z = math.pi - angle_of_person
+        self.nav_point_pub.publish(msg)
+        self.get_logger().info(f"Published: x={msg.point.x}, y={msg.point.y}, theta={msg.point.z}")
 
-        # decide if you can move, so that the robot is faceing the person
-            # either move along the x axis until difference in x is zero (check if possible)
-            # or you can move along the y-axis until the y is the same as the person
-
-        # turn towards the person once the x or y is the same
-        # move within a meter of the person and take a picture where the name is visible
-            # (optional) you could using orange detection to prevent the bot from getting too close, but that may not be needed
-            # if we are on the side of the robot where there is no code, move around the person until the code is found
-            # remember that is the aruco is found, its on one of the sides facing the robot, so we only need to check those sides
-        # retrace steps, so that you end back on the random path
-        
         self.scanning_code = False
 
     def change_motion_callback(self):
@@ -123,7 +119,7 @@ class ZetaNode(rclpy.node.Node):
         dumb_twister.angular = angular_vec
         twister = TwistStamped()
         twister.twist = dumb_twister
-        
+
         self.thrust_pub.publish(twister)
 
         self.get_logger().info("We have changed our motion")
