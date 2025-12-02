@@ -26,10 +26,11 @@ from collections import deque
 import numpy as np
 
 class Point:
-    def __init__(self, value=0, x=None, y=None):
+    def __init__(self, value=0, x=None, y=0, theta=0):
         self.value = value
         self.x = x
         self.y = y
+        self.theta = theta
 
     def equals(self, other):
         return self.x == other.x and self.y == other.y
@@ -96,6 +97,7 @@ class TempNode(rclpy.node.Node):
         # Create publisher and subscriptions
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(OccupancyGrid, 'map', self.map_callback, qos_profile=latching_qos)
+        self.create_subscription(PointStamped, 'nav_point', self.point_callback, qos_profile=qos_profile_sensor_data)
 
         # Declare TempNode initialized
         self.get_logger().info("TempNode initialized")
@@ -117,6 +119,17 @@ class TempNode(rclpy.node.Node):
     def map_callback(self, map_msg):
         """Process the map message for movement planning."""
         self.map = map_utils.Map(map_msg)
+
+    def point_callback(self, point_msg):
+        """Process incoming navigation points."""
+        x = int(point_msg.point.x)
+        y = int(point_msg.point.y)
+        theta = int(point_msg.point.z) # Assuming z holds orientation in radians
+        new_point = Point(value=self.priority_point_value, x=x, y=y, theta=theta)
+        self.points.push(new_point)
+        self.navigate_to_target(new_point)  # Immediately navigate to new priority point
+        self.get_logger().info(f"Received new navigation point at ({x}, {y}, {theta}) with priority value {self.priority_point_value}")
+
 
     def goal_checker_callback(self):
 
@@ -182,10 +195,10 @@ class TempNode(rclpy.node.Node):
             distance_to_next = math.hypot(current_position.x - point.x, current_position.y - point.y)
             distance_to_target = math.hypot(current_position.x - target_point.x, current_position.y - target_point.y)
 
-            if point.value == self.priority_point_value or (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
+            if (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
                 self.get_logger().info(f"Detour detected to point ({point.x}, {point.y})")
                 self.path.push(point) # change to stack stuff
-                self.chart_path_to_target(point) # change
+                self.navigate_to_target(point)
                 break
 
         pass
@@ -308,14 +321,8 @@ if __name__ == "__main__":
     main()
 
 
-# Set up canceling movements
-# How to get current position
-# Have path navigation handled in time callback
-# Recalculate path when new priority target is added
-# When victim found change map to say occupied so it is not revisited
-# Vision team needs to inform nav node of victim locations
-# Work out best way to create path from points and then remove points as they are visited
-# Use binary tree to store points for faster access?
+
+
 # Add in parameters
 # Check for syntax and logic errors
-# fix path planning callback to properly draw from points
+# change main to destroy on future complete
