@@ -29,7 +29,7 @@ class ZetaNode(rclpy.node.Node):
         self.bridge = CvBridge()
 
         self.subscription_img = self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_interp_callback, 10)
-        self.subscription_aruco = self.create_subscription(PoseStamped, '/aruco_poses', self.aruco_pose_callback, 10)
+        self.subscription_aruco = self.create_subscription(PoseArray, '/aruco_poses', self.aruco_pose_callback, 10)
         self.subscription_pos = self.create_subscription(Odometry, "/odom", self.pos_callback, 10)
 
         self.thrust_pub = self.create_publisher(TwistStamped, 'cmd_vel', 10)
