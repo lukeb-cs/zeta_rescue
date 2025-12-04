@@ -6,12 +6,16 @@ Navigation node for ROS2.
 Author: Hunter Fauntleroy
 """
 import math
+import os
 import time
+import cv2
+from cv_bridge import CvBridge
 import rclpy
 import rclpy.node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.action.client import ActionClient
 from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
@@ -19,8 +23,11 @@ from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 
 from nav_msgs.msg import OccupancyGrid
 from jmu_ros2_util import map_utils
+from sensor_msgs.msg import Image
 import tf_transformations
 from collections import deque
+from std_msgs.msg import Empty
+from zeta_competition_interfaces.msg import Victim
 
 
 import numpy as np
@@ -82,7 +89,6 @@ class TempNode(rclpy.node.Node):
         self.start_time = None
         self.goal_future = None # future for current goal
         self.cancel_future = None # future for goal cancellation
-        self.victims = [] # list of victims found
         self.path = Stack() # stack of points to travel to. When empty it draws from points (Use linked list)
         self.points = Stack() # store points in list
         self.point_index = 0 # index for current point in points list
@@ -91,6 +97,18 @@ class TempNode(rclpy.node.Node):
         self.future_event = None
         self.priority_point_value = 1000
 
+        self.bridge = CvBridge()
+        self.latest_victim_pose = None
+        self.latest_image = None
+        self.reported_victims = [] # list of victims
+
+        self.at_victim = False
+        self.rotating = False
+        self.rotation_start = None
+
+        self.save_path = os.path.expanduser('~/victim_images')
+        os.makedirs(self.save_path, exist_ok=True)
+
         # Create the action client.
         self.ac = ActionClient(self, NavigateToPose, '/navigate_to_pose')
 
@@ -98,16 +116,20 @@ class TempNode(rclpy.node.Node):
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(OccupancyGrid, 'map', self.map_callback, qos_profile=latching_qos)
         self.create_subscription(PointStamped, 'nav_point', self.point_callback, qos_profile=qos_profile_sensor_data)
+        self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10) #CHECK ROS TOPIC FOR CAMERA
+
+        self.create_subscription(Empty, '/report_requested', self.report_callback, 10)
+        self.create_publisher(Victim, '/victim', 10)
+        self.create_publisher(Twist, '/cmd_vel', 10)
 
         # Declare TempNode initialized
         self.get_logger().info("TempNode initialized")
 
         # Create timers for periodic checks
+        self.create_time(0.1, self.rotation_callback)
         self.create_timer(.1, self.goal_checker_callback)
         self.create_timer(.1, self.fill_path_and_points_callback)
         self.create_timer(.1, self.check_for_detours)
-
-
 
         # Declare parameters
         self.declare_parameter('node_count', 50)
@@ -116,6 +138,51 @@ class TempNode(rclpy.node.Node):
 
 
     # -------------------- callbacks --------------------
+    def image_callback(self, msg):
+        #Add
+        try:
+            self.latest_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except Exception as e:
+            self.get_logger().error(f"Image conversion failed: {e}")
+
+    def report_callback(self, msg):
+        if self.latest_image is None:
+            self.get_logger.warn("No image available")
+            return
+        if self.latest_victim_pose is None:
+            self.get_logger.warn("No victim position available")
+            return
+
+        for p in self.reported_victims:
+            if abs(p.location.pose.position.x - self.latest_victim_pose.pose.position.x) < 0.5:
+                self.get_logger().warn("Duplicate!")
+
+        #saving photos in case
+        filename = f"victim_{int(time.time())}.jpg"
+        filepath = os.path.join(self.save_path, filename)
+        cv2.imwrite(filepath, self.latest_image)
+
+        victim = Victim()
+        victim.image = self.bridge.cv2_to_imgmsg(self.latest_image, encoding='bgr8')
+        victim.location = self.latest_victim_pose
+
+        self.victim_pub.publish(victim)
+        self.reported_victims.append(victim)
+
+    def rotation_callback(self):
+        #Twisting the robot after it is at a victim to get a good picture, not necessary but good for a good pic
+        if not self.rotating:
+            return
+
+        twist = Twist()
+        twist.angular.z = 0.6
+        self.cmd_pub.publish(twist)
+
+        if time.time() - self.rotation_start > 3.0: #arbitrary time for now
+            twist.angular.z = 0.0
+            self.cmd_pub.publish(twist)
+            self.rotating = False
+
     def map_callback(self, map_msg):
         """Process the map message for movement planning."""
         self.map = map_utils.Map(map_msg)
@@ -151,6 +218,15 @@ class TempNode(rclpy.node.Node):
 
             if self.goal_future.result().status == GoalStatus.STATUS_SUCCEEDED:
                 self.get_logger().info("NAVIGATION SERVER REPORTS SUCCESS. EXITING!")
+                if self.goal_future.value == 1000: #check!
+                    self.latest_victim_pose = self.goal.pose
+                    self.at_victim = True
+                    self.rotating = True
+                    self.rotation_start = time.time()
+                else:
+                    self.at_victim = False
+                    self.rotating = False
+
                 self.path.pop()
                 self.ac.destroy()
                 self.future_event.set_result(True)
@@ -295,6 +371,9 @@ class TempNode(rclpy.node.Node):
 
     def navigate_to_target(self, target_point):
         # Cancel existing goal if present
+
+        self.at_victim = False
+        self.rotating = False
 
         if self.goal_future is not None:
             self.get_logger().info("Cancelling existing goal before sending new one.")
