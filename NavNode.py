@@ -97,7 +97,7 @@ class TempNode(rclpy.node.Node):
         # Create publisher and subscriptions
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(OccupancyGrid, 'map', self.map_callback, qos_profile=latching_qos)
-        self.create_subscription(PointStamped, 'nav_point', self.point_callback, qos_profile=qos_profile_sensor_data)
+        self.create_subscription(PointStamped, 'nav_point', self.point_callback, qos_profile=qos_profile_sensor_data) # change qos type?
 
         # Declare TempNode initialized
         self.get_logger().info("TempNode initialized")
