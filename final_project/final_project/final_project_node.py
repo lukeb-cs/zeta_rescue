@@ -1,3 +1,5 @@
+# Luke Brenningmeyer
+
 # Node setup
 import rclpy
 import rclpy.node
@@ -18,6 +20,12 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 
+# transformations
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from tf_transformations import euler_from_quaternion
+import tf2_geometry_msgs
+
 class Person:
     def __init__(self, x, y):
         self.x = x
@@ -28,25 +36,26 @@ class ZetaNode(rclpy.node.Node):
         super().__init__('zeta')
         self.bridge = CvBridge()
 
-        self.subscription_img = self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_interp_callback, 10)
+        # Orange detection not currently in use
+        # self.subscription_img = self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_interp_callback, 10)
         self.subscription_aruco = self.create_subscription(PoseArray, '/aruco_poses', self.aruco_pose_callback, 10)
         self.subscription_pos = self.create_subscription(Odometry, "/odom", self.pos_callback, 10)
 
-        self.thrust_pub = self.create_publisher(TwistStamped, 'cmd_vel', 10)
+        # Random navigation used earlier, no longer needed
+        # self.thrust_pub = self.create_publisher(TwistStamped, 'cmd_vel', 10)
         self.nav_point_pub = self.create_publisher(PointStamped, 'nav_point', 10)
 
         self.timer = self.create_timer(1.0, self.change_motion_callback)
 
         self.scanning_code = False
 
+        self.buffer = Buffer()
+        self.listener = TransformListener(self.buffer, self)
+
         self.x = 0.0
         self.y = 0.0
 
         self.person_list = []
-
-    def pos_callback(self, msg):
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
 
     def image_interp_callback(self, msg): # may not be used in final version
         img = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -70,25 +79,41 @@ class ZetaNode(rclpy.node.Node):
             return (-1, -1)         # lesser oranges have a lower number, around maxVal = 100
         return maxLoc
 
+    def pos_callback(self, msg):
+        self.x = msg.pose.pose.position.x
+        self.y = msg.pose.pose.position.y
+
     def aruco_pose_callback(self, poses):
         if self.scanning_code:
             return
         self.get_logger().info("Aruco is running the callback")
         self.get_logger().info(f"Poses: {poses}")
 
-        angle_from_bot = 0 # placeholder
-        angle_of_person = 0 # placeholder
-        distance = 1 # placeholder
+        p = poses.poses[0]
+        p1 = PoseStamped()
+        p1.pose.position.x = p.position.x
+        p1.pose.position.y = p.position.y
+        p1.pose.position.z = p.position.z
+        p1.pose.orientation.x = p.orientation.x
+        p1.pose.orientation.y = p.orientation.y
+        p1.pose.orientation.z = p.orientation.z
+        p1.pose.orientation.w = p.orientation.w
+
+        try:
+            p2 = self.buffer.transform(p1, "map")
+            self.get_logger().info('Publishing: "%s"' % p2)
+        except Exception as e:
+            self.get_logger().warn(str(e))
+
         self.scanning_code = True
 
-        # using the distance and angle, with trig functions, get the x and y position
-        x_dist = distance * math.cos(math.radians(angle_from_bot))
-        y_dist = distance * math.sin(math.radians(angle_from_bot))
-        x_loc = x_dist + self.x
-        y_loc = y_dist + self.y
+        x_loc = p2.pose.position.x
+        y_loc = p2.pose.position.y
 
-        # normalize the coords to remove small variance in points
-            # if the value is close to that of something we've already scanned, set scanning_code = False and return
+        q = p2.pose.orientation
+        quat = [q.x, q.y, q.z, q.w]
+        roll, pitch, yaw = euler_from_quaternion(quat)
+
         person = Person(x_loc, y_loc)
         for p in self.person_list:
             if abs(p.x - person.x) < 0.5 or abs(p.y - person.y) < 0.5:
@@ -97,11 +122,16 @@ class ZetaNode(rclpy.node.Node):
         self.person_list.append(person)
 
         change = 0.5 # 0.5 meters
+
+        front_x = x_loc + change * math.sin(yaw)
+        front_y = y_loc + change * math.cos(yaw)
+        theta = yaw + math.pi
+
         msg = PointStamped()
 
-        msg.point.x = change * math.sin(angle_of_person)
-        msg.point.y = change * math.cos(angle_of_person)
-        msg.point.z = math.pi - angle_of_person
+        msg.point.x = front_x
+        msg.point.y = front_y
+        msg.point.z = theta
         self.nav_point_pub.publish(msg)
         self.get_logger().info(f"Published: x={msg.point.x}, y={msg.point.y}, theta={msg.point.z}")
 
