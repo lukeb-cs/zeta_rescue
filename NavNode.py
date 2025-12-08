@@ -27,7 +27,7 @@ from sensor_msgs.msg import Image
 import tf_transformations
 from collections import deque
 from std_msgs.msg import Empty
-from zeta_competition_interfaces.msg import Victim
+ # from zeta_competition_interfaces.msg import Victim
 
 
 import numpy as np
@@ -120,7 +120,7 @@ class TempNode(rclpy.node.Node):
         self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_callback, 10) #CHECK ROS TOPIC FOR CAMERA
 
         self.create_subscription(Empty, '/report_requested', self.report_callback, 10)
-        self.create_publisher(Victim, '/victim', 10)
+        # self.create_publisher(Victim, '/victim', 10)
         self.create_publisher(Twist, '/cmd_vel', 10)
 
 
@@ -128,7 +128,7 @@ class TempNode(rclpy.node.Node):
         self.get_logger().info("TempNode initialized")
 
         # Create timers for periodic checks
-        self.create_time(0.1, self.rotation_callback)
+        self.create_timer(0.1, self.rotation_callback)
         self.create_timer(.1, self.goal_checker_callback)
         self.create_timer(.1, self.fill_path_and_points_callback)
         self.create_timer(.1, self.check_for_detours)
@@ -204,8 +204,8 @@ class TempNode(rclpy.node.Node):
 
         """Periodically check in on the progress of navigation."""
         if self.goal_future is None:
-            self.navigate_to_target(self.path.peek())
-            self.point_index += 1
+            if self.path.is_empty is False:
+                self.navigate_to_target(self.path.peek())
             return  # No goal has been sent yet.
 
         if not self.goal_future.done():
@@ -262,22 +262,24 @@ class TempNode(rclpy.node.Node):
 
     def check_for_detours(self):
         """Check if there are better points to navigate to en route to current target."""
-        if not self.points or len(self.points) < 2:
+        if not self.points:
             return  # Not enough points to check for detours
-        target_point = self.points.peek()
+        if self.path.is_empty is False:
+            target_point = self.points.peek()
 
-        current_position = self.get_current_position() # Placeholder for getting current position
-        for point in self.points:
-            if point.equals(target_point):
-                continue  # Skip the target point itself
-            distance_to_next = math.hypot(current_position.x - point.x, current_position.y - point.y)
-            distance_to_target = math.hypot(current_position.x - target_point.x, current_position.y - target_point.y)
+        # current_position_x = 0 # Placeholder for getting current position
+        # current_position_y = 0 # change
+        # for point in self.points:
+        #     if point.equals(target_point):
+        #         continue  # Skip the target point itself
+        #     distance_to_next = math.hypot(current_position_x - point.x, current_position_y - point.y)
+        #     distance_to_target = math.hypot(current_position_x - target_point.x, current_position_y - target_point.y)
 
-            if (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
-                self.get_logger().info(f"Detour detected to point ({point.x}, {point.y})")
-                self.path.push(point) # change to stack stuff
-                self.navigate_to_target(point)
-                break
+        #     if (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
+        #         self.get_logger().info(f"Detour detected to point ({point.x}, {point.y})")
+        #         self.path.push(point) # change to stack stuff
+        #         self.navigate_to_target(point)
+        #         break
 
         pass
 
@@ -299,7 +301,7 @@ class TempNode(rclpy.node.Node):
         tries = 0
         while len(points) < number_of_nodes and tries < max_tries:
             tries += 1
-            x = np.random.randint(0, self.map.info.width - 1)
+            x = np.random.randint(0, self.map.data.length()) # change
             y = np.random.randint(0, self.map.info.height - 1)
             val = map_utils.get_cell(self.map, x, y)
             if val == 0:

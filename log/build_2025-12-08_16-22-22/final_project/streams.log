@@ -1,0 +1,24 @@
+[1.999s] Invoking command in '/home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project': PYTHONPATH=/home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/build --no-deps symlink_data
+[2.761s] running develop
+[3.306s] running egg_info
+[3.306s] creating final_project.egg-info
+[3.356s] writing final_project.egg-info/PKG-INFO
+[3.357s] writing dependency_links to final_project.egg-info/dependency_links.txt
+[3.357s] writing entry points to final_project.egg-info/entry_points.txt
+[3.358s] writing requirements to final_project.egg-info/requires.txt
+[3.358s] writing top-level names to final_project.egg-info/top_level.txt
+[3.358s] writing manifest file 'final_project.egg-info/SOURCES.txt'
+[3.466s] reading manifest file 'final_project.egg-info/SOURCES.txt'
+[3.467s] writing manifest file 'final_project.egg-info/SOURCES.txt'
+[3.602s] running build_ext
+[3.602s] Creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/lib/python3.12/site-packages/final-project.egg-link (link to .)
+[3.603s] Installing final_project_node script to /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/lib/final_project
+[3.603s] 
+[3.604s] Installed /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project
+[3.604s] running symlink_data
+[3.604s] creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index
+[3.604s] creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index/resource_index
+[3.604s] creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index/resource_index/packages
+[3.604s] symbolically linking /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/resource/final_project -> /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index/resource_index/packages
+[3.605s] symbolically linking /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/package.xml -> /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/final_project
+[3.696s] Invoked command in '/home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project' returned '0': PYTHONPATH=/home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/build --no-deps symlink_data

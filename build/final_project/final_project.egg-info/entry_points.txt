@@ -1,0 +1,2 @@
+[console_scripts]
+final_project_node = final_project.final_project_node:main

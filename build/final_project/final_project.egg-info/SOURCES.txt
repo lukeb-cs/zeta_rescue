@@ -1,0 +1,13 @@
+package.xml
+setup.cfg
+setup.py
+final_project/__init__.py
+final_project/final_project_node.py
+final_project.egg-info/PKG-INFO
+final_project.egg-info/SOURCES.txt
+final_project.egg-info/dependency_links.txt
+final_project.egg-info/entry_points.txt
+final_project.egg-info/requires.txt
+final_project.egg-info/top_level.txt
+final_project.egg-info/zip-safe
+resource/final_project

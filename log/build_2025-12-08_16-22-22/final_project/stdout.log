@@ -1,0 +1,22 @@
+running develop
+running egg_info
+creating final_project.egg-info
+writing final_project.egg-info/PKG-INFO
+writing dependency_links to final_project.egg-info/dependency_links.txt
+writing entry points to final_project.egg-info/entry_points.txt
+writing requirements to final_project.egg-info/requires.txt
+writing top-level names to final_project.egg-info/top_level.txt
+writing manifest file 'final_project.egg-info/SOURCES.txt'
+reading manifest file 'final_project.egg-info/SOURCES.txt'
+writing manifest file 'final_project.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/lib/python3.12/site-packages/final-project.egg-link (link to .)
+Installing final_project_node script to /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/lib/final_project
+
+Installed /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project
+running symlink_data
+creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index
+creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index/resource_index
+creating /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index/resource_index/packages
+symbolically linking /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/resource/final_project -> /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/ament_index/resource_index/packages
+symbolically linking /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/build/final_project/package.xml -> /home/fauntlht/dev_ws/src/CS354-Final-Project_Luke-Joshua-Jessica-Hunter/install/final_project/share/final_project
