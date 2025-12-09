@@ -20,6 +20,8 @@ from sensor_msgs.msg import LaserScan
 from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy
+from functools import total_ordering
+from rclpy.task import Future
 
 from nav_msgs.msg import OccupancyGrid
 from jmu_ros2_util import map_utils
@@ -33,14 +35,22 @@ from std_msgs.msg import Empty
 import numpy as np
 
 class Point:
-    def __init__(self, value=0, x=None, y=0, theta=0):
+    def __init__(self, value=0.0, x=0.0, y=0.0, z=0.0, theta=0.0):
         self.value = value
         self.x = x
         self.y = y
+        self.z = z
         self.theta = theta
 
     def equals(self, other):
         return self.x == other.x and self.y == other.y
+
+    def __eq__(self, other):
+        return (self.x, self.y, self.theta, self.value) == \
+               (other.x, other.y, other.theta, other.value)
+
+    def __lt__(self, other):
+        return self.value < other.value
 
 class Stack:
     def __init__(self):
@@ -129,7 +139,7 @@ class TempNode(rclpy.node.Node):
 
         # Create timers for periodic checks
         self.create_timer(0.1, self.rotation_callback)
-        self.create_timer(.1, self.goal_checker_callback)
+        self.create_timer(1, self.goal_checker_callback)
         self.create_timer(.1, self.fill_path_and_points_callback)
         self.create_timer(.1, self.check_for_detours)
 
@@ -191,10 +201,11 @@ class TempNode(rclpy.node.Node):
 
     def point_callback(self, point_msg):
         """Process incoming navigation points."""
-        x = int(point_msg.point.x)
-        y = int(point_msg.point.y)
-        theta = int(point_msg.point.z) # Assuming z holds orientation in radians
-        new_point = Point(value=self.priority_point_value, x=x, y=y, theta=theta)
+        
+        x = point_msg.point.x
+        y = point_msg.point.y
+        theta = point_msg.point.z # Assuming z holds orientation in radians
+        new_point = Point(self.priority_point_value, x, y, 0.0, theta)
         self.points.push(new_point)
         self.navigate_to_target(new_point)  # Immediately navigate to new priority point
         self.get_logger().info(f"Received new navigation point at ({x}, {y}, {theta}) with priority value {self.priority_point_value}")
@@ -204,8 +215,6 @@ class TempNode(rclpy.node.Node):
 
         """Periodically check in on the progress of navigation."""
         if self.goal_future is None:
-            if self.path.is_empty is False:
-                self.navigate_to_target(self.path.peek())
             return  # No goal has been sent yet.
 
         if not self.goal_future.done():
@@ -214,30 +223,38 @@ class TempNode(rclpy.node.Node):
         elif self.cancel_future is not None:  # We've cancelled and are waiting for ack.
             if self.cancel_future.done():
                 self.get_logger().info("SERVER HAS ACKNOWLEDGED CANCELLATION")
-                self.ac.destroy()
+                # self.ac.destroy()
                 self.future_event.set_result(False)
+                time.sleep(1)
+                self.path.pop()
+                self.cancel_future = None
+                self.future_event.set_result(True)
         else:
 
             if self.goal_future.result().status == GoalStatus.STATUS_SUCCEEDED:
                 self.get_logger().info("NAVIGATION SERVER REPORTS SUCCESS. EXITING!")
-                if self.goal_future.value == 1000: #check!
-                    self.latest_victim_pose = self.goal.pose
-                    self.at_victim = True
-                    self.rotating = True
-                    self.rotation_start = time.time()
-                else:
-                    self.at_victim = False
-                    self.rotating = False
+                # if self.goal_future.value == 1000: #check!
+                #     self.latest_victim_pose = self.goal.pose
+                #     self.at_victim = True
+                #     self.rotating = True
+                #     self.rotation_start = time.time()
+                # else:
+                #     self.at_victim = False
+                #     self.rotating = False
 
+                
                 self.path.pop()
-                self.ac.destroy()
-                self.future_event.set_result(True)
+                
+                
+                # self.ac.destroy()
+                
+                
 
             if self.goal_future.result().status == GoalStatus.STATUS_ABORTED:
                 self.get_logger().info("NAVIGATION SERVER HAS ABORTED. EXITING!")
-                self.path.pop()
-                self.ac.destroy()
-                self.future_event.set_result(False)
+                if self.path.is_empty is False:
+                    self.path.pop()
+                # self.ac.destroy()
 
             elif time.time() - self.start_time > self.timeout:
                 self.get_logger().info("TAKING TOO LONG. CANCELLING GOAL!")
@@ -257,7 +274,10 @@ class TempNode(rclpy.node.Node):
         if self.path.is_empty(): # No current path, need to plan
             self.get_logger().info("Planning new path.")
             self.path.push(self.points.pop())
+            self.navigate_to_target(self.path.peek())
+            self.get_logger().info("Selecting new target")
             return
+ 
 
 
     def check_for_detours(self):
@@ -287,6 +307,12 @@ class TempNode(rclpy.node.Node):
 
     # -------------------- planning utilities --------------------
 
+    def resetGoals(self):
+        self.goal_future = None # future for current goal
+        self.cancel_future = None 
+        self.future_event == None
+
+
 
     def find_random_valid_points(self, number_of_nodes=20):
         """Sample random cells and return Points (world coords) that are free.
@@ -301,9 +327,9 @@ class TempNode(rclpy.node.Node):
         tries = 0
         while len(points) < number_of_nodes and tries < max_tries:
             tries += 1
-            x = np.random.randint(0, self.map.data.length()) # change
-            y = np.random.randint(0, self.map.info.height - 1)
-            val = map_utils.get_cell(self.map, x, y)
+            x = np.random.randint(0, 50) # change
+            y = np.random.randint(0, 50)
+            val = self.map.get_cell(x, y)
             if val == 0:
                 points.append(Point(value=0, x=x, y=y))
             self.node_value(points)
@@ -312,7 +338,7 @@ class TempNode(rclpy.node.Node):
 
 
 
-    def node_value(self, points, range=4, threshold=10):
+    def node_value(self, points, r=4, threshold=10):
         """Assign values to points based on free space around them and spacing."""
 
         if not points or self.map is None:
@@ -324,10 +350,10 @@ class TempNode(rclpy.node.Node):
 
         for point in points:
             # Clamp search window to map bounds
-            x_min = max(0, point.x - range)
-            x_max = min(self.map.info.width - 1, point.x + range)
-            y_min = max(0, point.y - range)
-            y_max = min(self.map.info.height - 1, point.y + range)
+            x_min = max(0, point.x - r)
+            x_max = min(50, point.x + r)
+            y_min = max(0, point.y - r)
+            y_max = min(50 - 1, point.y + r)
 
             for i in range(x_min, x_max + 1):  # Iterate through square area within bounds
                 for j in range(y_min, y_max + 1):
@@ -351,25 +377,29 @@ class TempNode(rclpy.node.Node):
                     p.value -= 0.5  # small penalty for crowding
 
         # Finally, sort points by value
-        self.sort_points_by_value(points)
+
+        points.sort(reverse=True)
 
 
     # -------------------- path planning --------------------
 
-    def create_nav_goal(self, point, theta):
+    def create_nav_goal(self, point):
         """Create a NavigateToPose Goal from a Point and orientation theta (radians)."""
         goal = NavigateToPose.Goal()
 
         goal.pose.header.frame_id = 'map'
-        goal.pose.pose.position.x = point.x
-        goal.pose.pose.position.y = point.y
+        goal.pose.pose.position.x = float(point.x)
+        goal.pose.pose.position.y = float(point.y)
+        goal.pose.pose.position.z = 0.0
+
 
         # We need to convert theta to a quaternion....
-        quaternion = tf_transformations.quaternion_from_euler(0, 0, theta, 'rxyz')
+        quaternion = tf_transformations.quaternion_from_euler(0, 0, point.theta, 'rxyz')
         goal.pose.pose.orientation.x = quaternion[0]
         goal.pose.pose.orientation.y = quaternion[1]
         goal.pose.pose.orientation.z = quaternion[2]
         goal.pose.pose.orientation.w = quaternion[3]
+
         return goal
 
 
@@ -379,16 +409,18 @@ class TempNode(rclpy.node.Node):
         self.at_victim = False
         self.rotating = False
 
-        if self.goal_future is not None:
-            self.get_logger().info("Cancelling existing goal before sending new one.")
-            self.cancel_future = self.goal_future.result().cancel_goal_async()
+        # if self.goal_future is not None:
+        #     self.get_logger().info("Cancelling existing goal before sending new one.")
+        #     self.cancel_future = self.goal_future.result().cancel_goal_async()
 
         # Create and send new goal
 
-        self.goal = self.create_nav_goal(target_point, 0.0)
+        self.goal = self.create_nav_goal(target_point)
         self.ac.wait_for_server()
         self.start_time = time.time()
         self.goal_future = self.ac.send_goal_async(self.goal)
+
+        self.future_event = Future()
 
 
 
