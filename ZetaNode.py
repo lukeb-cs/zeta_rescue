@@ -23,6 +23,7 @@ from sensor_msgs.msg import Image
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf_transformations import euler_from_quaternion
+import tf2_geometry_msgs # DONT REMOVE
 
 class Person:
     def __init__(self, x, y):
@@ -73,7 +74,7 @@ class ZetaNode(rclpy.node.Node):
     #     orange_score = r - np.abs(g - 0.6 * r) - b * 0.5
     #     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(orange_score)
 
-    #     if maxVal < 120: # 140:            # pumpkin orange generally sits around maxVal = 180
+    #     if maxVal < 140:            # pumpkin orange generally sits around maxVal = 180
     #         return (-1, -1)         # lesser oranges have a lower number, around maxVal = 100
     #     return maxLoc
 
@@ -84,11 +85,12 @@ class ZetaNode(rclpy.node.Node):
     def aruco_pose_callback(self, poses):
         if self.scanning_code:
             return
-        self.get_logger().info("Aruco is running the callback")
-        self.get_logger().info(f"Poses: {poses}")
+        # self.get_logger().info(f"Poses: {poses}")
 
         p = poses.poses[0]
         p1 = PoseStamped()
+        #p1.header.stamp = self.get_clock().now().to_msg()
+        p1.header.frame_id = "oakd_rgb_camera_optical_frame"
         p1.pose.position.x = p.position.x
         p1.pose.position.y = p.position.y
         p1.pose.position.z = p.position.z
@@ -99,9 +101,10 @@ class ZetaNode(rclpy.node.Node):
 
         try:
             p2 = self.buffer.transform(p1, "map")
-            self.get_logger().info('Publishing: "%s"' % p2)
+            # self.get_logger().info('Publishing: "%s"' % p2)
         except Exception as e:
             self.get_logger().warn(str(e))
+            return
 
         self.scanning_code = True
 
@@ -119,11 +122,11 @@ class ZetaNode(rclpy.node.Node):
                 return
         self.person_list.append(person)
 
-        change = 0.5 # 0.5 meters
+        change = 0.3 # meters
 
         front_x = x_loc + change * math.sin(yaw)
         front_y = y_loc + change * math.cos(yaw)
-        theta = yaw + math.pi
+        theta = (yaw + math.pi) % (2 * math.pi) # might need to change this to (math.pi)
 
         msg = PointStamped()
 
