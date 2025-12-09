@@ -5,26 +5,24 @@ import rclpy
 import rclpy.node
 
 # Other imports
+import numpy as np
+import math
+# -- No longer using these imports --
 import cv2
 from cv_bridge import CvBridge
-import numpy as np
 import random
-import math
 
 # Message types
-from geometry_msgs.msg import PoseArray, PoseStamped
-from geometry_msgs.msg import TwistStamped
-from geometry_msgs.msg import Twist
-from geometry_msgs.msg import Vector3
-from geometry_msgs.msg import PointStamped
-from sensor_msgs.msg import Image
+from geometry_msgs.msg import PoseArray, PoseStamped, PointStamped
 from nav_msgs.msg import Odometry
+# -- No longer using these imports --
+from geometry_msgs.msg import TwistStamped, Twist, Vector3
+from sensor_msgs.msg import Image
 
 # transformations
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf_transformations import euler_from_quaternion
-import tf2_geometry_msgs
 
 class Person:
     def __init__(self, x, y):
@@ -34,18 +32,18 @@ class Person:
 class ZetaNode(rclpy.node.Node):
     def __init__(self):
         super().__init__('zeta')
-        self.bridge = CvBridge()
 
-        # Orange detection not currently in use
+        # -- Orange detection not currently in use --
+        # self.bridge = CvBridge()
         # self.subscription_img = self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_interp_callback, 10)
+
+        # -- Random navigation used earlier, no longer needed --
+        # self.thrust_pub = self.create_publisher(TwistStamped, 'cmd_vel', 10)
+        # self.timer = self.create_timer(1.0, self.change_motion_callback)
+
         self.subscription_aruco = self.create_subscription(PoseArray, '/aruco_poses', self.aruco_pose_callback, 10)
         self.subscription_pos = self.create_subscription(Odometry, "/odom", self.pos_callback, 10)
-
-        # Random navigation used earlier, no longer needed
-        # self.thrust_pub = self.create_publisher(TwistStamped, 'cmd_vel', 10)
         self.nav_point_pub = self.create_publisher(PointStamped, 'nav_point', 10)
-
-        self.timer = self.create_timer(1.0, self.change_motion_callback)
 
         self.scanning_code = False
 
@@ -57,27 +55,27 @@ class ZetaNode(rclpy.node.Node):
 
         self.person_list = []
 
-    def image_interp_callback(self, msg): # may not be used in final version
-        img = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        pumpkin_location = self.image_helper(img)
-        if pumpkin_location[0] == -1 and pumpkin_location[1] == -1:
-            self.get_logger().info(f"No pumpkin found")
-        else:
-            self.get_logger().info("Orange object located in front of robot")
-            if pumpkin_location[1] < 100: # checking if the orange pixel is located at the top of the image
-                self.get_logger().info("Orange object is close to the robot")
+    # def image_interp_callback(self, msg): # may not be used in final version
+    #     img = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+    #     pumpkin_location = self.image_helper(img)
+    #     if pumpkin_location[0] == -1 and pumpkin_location[1] == -1:
+    #         self.get_logger().info(f"No pumpkin found")
+    #     else:
+    #         self.get_logger().info("Orange object located in front of robot")
+    #         if pumpkin_location[1] < 100: # checking if the orange pixel is located at the top of the image
+    #             self.get_logger().info("Orange object is close to the robot")
 
-    def image_helper(self, img):
-        r = img[:, :, 2].astype(np.float32)
-        g = img[:, :, 1].astype(np.float32)
-        b = img[:, :, 0].astype(np.float32)
+    # def image_helper(self, img):
+    #     r = img[:, :, 2].astype(np.float32)
+    #     g = img[:, :, 1].astype(np.float32)
+    #     b = img[:, :, 0].astype(np.float32)
 
-        orange_score = r - np.abs(g - 0.6 * r) - b * 0.5
-        minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(orange_score)
+    #     orange_score = r - np.abs(g - 0.6 * r) - b * 0.5
+    #     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(orange_score)
 
-        if maxVal < 120: # 140:            # pumpkin orange generally sits around maxVal = 180
-            return (-1, -1)         # lesser oranges have a lower number, around maxVal = 100
-        return maxLoc
+    #     if maxVal < 120: # 140:            # pumpkin orange generally sits around maxVal = 180
+    #         return (-1, -1)         # lesser oranges have a lower number, around maxVal = 100
+    #     return maxLoc
 
     def pos_callback(self, msg):
         self.x = msg.pose.pose.position.x
@@ -112,7 +110,7 @@ class ZetaNode(rclpy.node.Node):
 
         q = p2.pose.orientation
         quat = [q.x, q.y, q.z, q.w]
-        roll, pitch, yaw = euler_from_quaternion(quat)
+        _, _, yaw = euler_from_quaternion(quat)
 
         person = Person(x_loc, y_loc)
         for p in self.person_list:
@@ -137,22 +135,22 @@ class ZetaNode(rclpy.node.Node):
 
         self.scanning_code = False
 
-    def change_motion_callback(self):
-        if self.scanning_code:
-            return
-        dumb_twister = Twist()
-        linear_vec = Vector3()
-        linear_vec.x = 0.2
-        dumb_twister.linear = linear_vec
-        angular_vec = Vector3()
-        angular_vec.z = random.uniform(-1.0, 1.0)
-        dumb_twister.angular = angular_vec
-        twister = TwistStamped()
-        twister.twist = dumb_twister
+    # def change_motion_callback(self):
+    #     if self.scanning_code:
+    #         return
+    #     dumb_twister = Twist()
+    #     linear_vec = Vector3()
+    #     linear_vec.x = 0.2
+    #     dumb_twister.linear = linear_vec
+    #     angular_vec = Vector3()
+    #     angular_vec.z = random.uniform(-1.0, 1.0)
+    #     dumb_twister.angular = angular_vec
+    #     twister = TwistStamped()
+    #     twister.twist = dumb_twister
 
-        self.thrust_pub.publish(twister)
+    #     self.thrust_pub.publish(twister)
 
-        self.get_logger().info("We have changed our motion")
+    #     self.get_logger().info("We have changed our motion")
 
 def main():
     rclpy.init()
