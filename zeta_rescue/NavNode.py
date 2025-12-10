@@ -265,8 +265,6 @@ class TempNode(rclpy.node.Node):
                 # else:
                 #     self.at_victim = False
                 #     self.rotating = False
-
-
                 self.path.pop()
 
 
@@ -344,11 +342,6 @@ class TempNode(rclpy.node.Node):
 
     # -------------------- planning utilities --------------------
 
-    def resetGoals(self):
-        self.goal_future = None # future for current goal
-        self.cancel_future = None
-        self.future_event == None
-
 
 
     def find_random_valid_points(self, number_of_nodes=20):
@@ -412,7 +405,7 @@ class TempNode(rclpy.node.Node):
                 if dist < threshold:
                     # if another point nearby has high value, give a small boost (encourage cluster usefulness)
                     p.value += 0.1 * q.value
-                    p.value -= 0.5  # small penalty for crowding
+                    p.value -= 2  # small penalty for crowding
 
         # Finally, sort points by value
         points.sort(reverse=True)
