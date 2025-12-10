@@ -295,6 +295,7 @@ class TempNode(rclpy.node.Node):
         if self.points.is_empty(): # No points currently available
             self.get_logger().info("Generating new points.")
             temp_points = self.find_random_valid_points(number_of_nodes=10)
+            time.sleep(1.5) # Give the bot some time to generate points
             for p in temp_points:
                 self.get_logger().info(f"New point added to points: ({p.x}, {p.y})")
 
