@@ -362,13 +362,13 @@ class TempNode(rclpy.node.Node):
         tries = 0
         while len(points) < number_of_nodes and tries < max_tries:
             tries += 1
-            x = np.random.randint(0, 50) # change
-            y = np.random.randint(0, 50)
+            x = np.random.randint(0, self.map.info.width) # change
+            y = np.random.randint(0, self.map.info.height)
             val = self.map.get_cell(x, y)
             if val == 0:
                 points.append(Point(value=0, x=x, y=y))
 
-        self.node_value(list(set(points)))
+        self.node_value(points)
         for p in points:
             self.points.push(p)
 
