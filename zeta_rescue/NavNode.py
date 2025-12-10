@@ -396,16 +396,6 @@ class TempNode(rclpy.node.Node):
                     if val == 0:
                         point.value += 1 # Increment value for each free cell in range
 
-        # Penalize points that are too close to each other, reward spaced-out points
-        for p in points:
-            for q in points:
-                if q is p:
-                    continue
-                dist = math.hypot(p.x - q.x, p.y - q.y)
-                if dist < threshold:
-                    # if another point nearby has high value, give a small boost (encourage cluster usefulness)
-                    p.value += 0.1 * q.value
-                    p.value -= 2  # small penalty for crowding
 
         # Finally, sort points by value
         points.sort(reverse=True)
