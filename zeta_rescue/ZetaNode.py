@@ -126,7 +126,8 @@ class ZetaNode(rclpy.node.Node):
 
         front_x = x_loc + change * math.sin(yaw)
         front_y = y_loc + change * math.cos(yaw)
-        theta = (yaw + math.pi) % (2 * math.pi) # might need to change this to (math.pi)
+        theta = (yaw + math.pi)
+        theta = (theta + math.pi) % (2 * math.pi) - math.pi
 
         msg = PointStamped()
 
