@@ -50,6 +50,8 @@ class Point:
     def __eq__(self, other):
         return (self.x, self.y, self.theta, self.value) == \
                (other.x, other.y, other.theta, other.value)
+    def __hash__(self):
+        return hash((self.x, self.y))
 
     def __lt__(self, other):
         return self.value < other.value
@@ -365,9 +367,10 @@ class TempNode(rclpy.node.Node):
             val = self.map.get_cell(x, y)
             if val == 0:
                 points.append(Point(value=0, x=x, y=y))
-            self.node_value(array.array('i', set(points)))
-            for p in points:
-                self.points.push(p)
+
+        self.node_value(list(set(points)))
+        for p in points:
+            self.points.push(p)
 
         return points
 
