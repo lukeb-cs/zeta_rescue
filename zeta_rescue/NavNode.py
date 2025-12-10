@@ -216,7 +216,7 @@ class TempNode(rclpy.node.Node):
         y = point_msg.point.y
         theta = point_msg.point.z # Assuming z holds orientation in radians
         new_point = Point(self.priority_point_value, x, y, 0.0, theta)
-        self.points.push(new_point)
+        self.path.push(new_point)
         self.navigate_to_target(new_point)  # Immediately navigate to new priority point
         self.get_logger().info(f"Received new navigation point at ({x}, {y}, {theta}) with priority value {self.priority_point_value}")
 
