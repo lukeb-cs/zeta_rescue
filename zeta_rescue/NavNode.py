@@ -308,34 +308,6 @@ class TempNode(rclpy.node.Node):
             return
 
 
-
-    def check_for_detours(self):
-        """Check if there are better points to navigate to en route to current target."""
-
-        if not self.points:
-            return  # Not enough points to check for detours
-        if self.path.is_empty is False:
-            target_point = self.points.peek()
-
-
-        # current_position_x = 0 # Placeholder for getting current position
-        # current_position_y = 0 # change
-        # for point in self.points:
-        #     if point.equals(target_point):
-        #         continue  # Skip the target point itself
-        #     distance_to_next = math.hypot(current_position_x - point.x, current_position_y - point.y)
-        #     distance_to_target = math.hypot(current_position_x - target_point.x, current_position_y - target_point.y)
-
-
-        #     if (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
-        #         self.get_logger().info(f"Detour detected to point ({point.x}, {point.y})")
-        #         self.path.push(point) # change to stack stuff
-        #         self.navigate_to_target(point)
-        #         break
-
-        pass
-
-
     def speed_and_distance_callback(self, msg):
         # self.get_logger().info(f"Message: {msg.pose.pose.position.x}") # If ya ever want to know how to dissect the amcl_pose message
         if self.position is None:
@@ -377,7 +349,7 @@ class TempNode(rclpy.node.Node):
 
 
 
-    def node_value(self, points, r=4):
+    def node_value(self, points, r=6):
         """Assign values to points based on free space around them and spacing."""
 
         if not points or self.map is None:
