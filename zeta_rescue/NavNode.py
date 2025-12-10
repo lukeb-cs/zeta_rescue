@@ -293,8 +293,8 @@ class TempNode(rclpy.node.Node):
 
         if self.points.is_empty(): # No points currently available
             self.get_logger().info("Generating new points.")
-            self.find_random_valid_points(number_of_nodes=10)
-            for p in self.points:
+            temp_points = self.find_random_valid_points(number_of_nodes=10)
+            for p in temp_points:
                 self.get_logger().info(f"New point added to points: ({p.x}, {p.y})")
 
             return
@@ -369,6 +369,8 @@ class TempNode(rclpy.node.Node):
             self.node_value(points)
             for p in points:
                 self.points.push(p)
+
+        return points
 
 
 
