@@ -5,6 +5,7 @@ Navigation node for ROS2.
 
 Author: Hunter Fauntleroy, Jessica Debes & Joshua Sun
 """
+import array
 import math
 import os
 import time
@@ -248,8 +249,6 @@ class TempNode(rclpy.node.Node):
             if self.cancel_future.done():
                 self.get_logger().info("SERVER HAS ACKNOWLEDGED CANCELLATION")
                 # self.ac.destroy()
-                self.future_event.set_result(False)
-                time.sleep(1)
                 self.path.pop()
                 self.cancel_future = None
                 self.future_event.set_result(True)
@@ -366,7 +365,7 @@ class TempNode(rclpy.node.Node):
             val = self.map.get_cell(x, y)
             if val == 0:
                 points.append(Point(value=0, x=x, y=y))
-            self.node_value(points)
+            self.node_value(array.array('i', set(points)))
             for p in points:
                 self.points.push(p)
 
