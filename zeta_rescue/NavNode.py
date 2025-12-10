@@ -3,7 +3,7 @@
 Navigation node for ROS2.
 
 
-Author: Hunter Fauntleroy, Jessica Debes
+Author: Hunter Fauntleroy, Jessica Debes & Joshua Sun
 """
 import math
 import os
@@ -16,6 +16,7 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy.action.client import ActionClient
 from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import Twist
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from sensor_msgs.msg import LaserScan
 from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
@@ -118,6 +119,12 @@ class TempNode(rclpy.node.Node):
 
         self.save_path = os.path.expanduser('~/victim_images')
         os.makedirs(self.save_path, exist_ok=True)
+        self.distance_travelled = 0 # Running odometer
+        self.speed = None # Average bot speed: Total distance travelled / time
+        self.start_position = None # Return position when finished
+        self.position = None # Makes the assumption that the bot starts at 0,0 upon initialization.
+        self.max_time = 300 # Time of test, typcially 5 min. Bot expected to return by this time 
+        self.returning = False # Whether the bot's only objective is to return to start.
 
         # Create the action client.
         self.ac = ActionClient(self, NavigateToPose, '/navigate_to_pose')
@@ -125,14 +132,14 @@ class TempNode(rclpy.node.Node):
         # Create publisher and subscriptions
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(OccupancyGrid, 'map', self.map_callback, qos_profile=latching_qos)
-
         self.create_subscription(PointStamped, 'nav_point', self.point_callback, qos_profile=qos_profile_sensor_data)
         self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_callback, 10) #CHECK ROS TOPIC FOR CAMERA
 
         self.create_subscription(Empty, '/report_requested', self.report_callback, 10)
         # self.create_publisher(Victim, '/victim', 10)
         self.create_publisher(Twist, '/cmd_vel', 10)
-
+        self.create_subscription(PoseWithCovarianceStamped, 'amcl_pose', self.speed_and_distance_callback, qos_profile=latching_qos)
+        # Type unclear. Could be "Pointstamped" or "Point" or something else.
 
         # Declare TempNode initialized
         self.get_logger().info("TempNode initialized")
@@ -212,12 +219,29 @@ class TempNode(rclpy.node.Node):
 
 
     def goal_checker_callback(self):
+        if self.start_time is None:
+            self.start_time = time.time()
+        elif (self.returning is False and self.position is not None and self.speed is not None):   
+            # Reccomended by Prof. Molloy: Distance w/ extra
+            # When to return: time left < distance / speed
+            
+            if self.max_time - (time.time() - self.start_time) < math.hypot(self.start_position.x - self.position.x, self.start_position.y - self.position.y) / self.speed:
+                self.returning = True
+                self.ac.destroy()
+                create_nav_goal(self, self.start_position, 0) # Assumes starting angle is irrelevant.
+            
+
+        if self.returning is True:
+            return
 
         """Periodically check in on the progress of navigation."""
         if self.goal_future is None:
             return  # No goal has been sent yet.
 
-        if not self.goal_future.done():
+        if self.goal_future is None:
+            self.get_logger().info("NAVIGATION GOAL NOT YET ACCEPTED")
+
+        elif not self.goal_future.done():
             self.get_logger().info("NAVIGATION GOAL NOT YET ACCEPTED")
 
         elif self.cancel_future is not None:  # We've cancelled and are waiting for ack.
@@ -260,6 +284,7 @@ class TempNode(rclpy.node.Node):
                 self.get_logger().info("TAKING TOO LONG. CANCELLING GOAL!")
                 self.cancel_future = self.goal_future.result().cancel_goal_async()
 
+
     def fill_path_and_points_callback(self):
         """Periodically check and add new points."""
         if self.map is None: # Cannot plan without a map
@@ -282,10 +307,12 @@ class TempNode(rclpy.node.Node):
 
     def check_for_detours(self):
         """Check if there are better points to navigate to en route to current target."""
+
         if not self.points:
             return  # Not enough points to check for detours
         if self.path.is_empty is False:
             target_point = self.points.peek()
+
 
         # current_position_x = 0 # Placeholder for getting current position
         # current_position_y = 0 # change
@@ -294,6 +321,7 @@ class TempNode(rclpy.node.Node):
         #         continue  # Skip the target point itself
         #     distance_to_next = math.hypot(current_position_x - point.x, current_position_y - point.y)
         #     distance_to_target = math.hypot(current_position_x - target_point.x, current_position_y - target_point.y)
+
 
         #     if (distance_to_next < distance_to_target / 2.0) and (point.value / self.start_time > 5):  # Detour threshold and value threshold change to parameters
         #         self.get_logger().info(f"Detour detected to point ({point.x}, {point.y})")
@@ -304,6 +332,15 @@ class TempNode(rclpy.node.Node):
         pass
 
 
+    def speed_and_distance_callback(self, msg):
+        # self.get_logger().info(f"Message: {msg.pose.pose.position.x}") # If ya ever want to know how to dissect the amcl_pose message
+        if self.position is None:
+            self.position = msg.pose.pose.position
+            self.start_position = Point(x = msg.pose.pose.position.x, y = msg.pose.pose.position.y)
+        self.distance_travelled = self.distance_travelled + math.hypot(self.position.x - msg.pose.pose.position.x, self.position.y - msg.pose.pose.position.y)
+        if (self.distance_travelled != 0 and self.start_time is not None):
+            self.speed = (self.distance_travelled) / (time.time() - self.start_time)
+        self.position = Point(x = msg.pose.pose.position.x, y = msg.pose.pose.position.y)
 
     # -------------------- planning utilities --------------------
 
@@ -355,6 +392,7 @@ class TempNode(rclpy.node.Node):
             y_min = max(0, point.y - r)
             y_max = min(50 - 1, point.y + r)
 
+
             for i in range(x_min, x_max + 1):  # Iterate through square area within bounds
                 for j in range(y_min, y_max + 1):
                     val = self.map.get_cell(i, j)
@@ -377,7 +415,6 @@ class TempNode(rclpy.node.Node):
                     p.value -= 0.5  # small penalty for crowding
 
         # Finally, sort points by value
-
         points.sort(reverse=True)
 
 
