@@ -265,6 +265,8 @@ class TempNode(rclpy.node.Node):
                 # else:
                 #     self.at_victim = False
                 #     self.rotating = False
+                popped_point = self.path.peek()
+                self.get_logger().info(f"Goal succeeded, popping path point ({popped_point.x}, {popped_point.y})")
                 self.path.pop()
 
 
@@ -291,14 +293,16 @@ class TempNode(rclpy.node.Node):
 
         if self.points.is_empty(): # No points currently available
             self.get_logger().info("Generating new points.")
-            self.find_random_valid_points(number_of_nodes=50)
+            self.find_random_valid_points(number_of_nodes=10)
+            for p in self.points:
+                self.get_logger().info(f"New point added to points: ({p.x}, {p.y})")
+
             return
 
         if self.path.is_empty(): # No current path, need to plan
-            self.get_logger().info("Planning new path.")
             self.path.push(self.points.pop())
             self.navigate_to_target(self.path.peek())
-            self.get_logger().info("Selecting new target")
+            self.get_logger().info("Selecting new target at ({}, {})".format(self.path.peek().x, self.path.peek().y))
             return
 
 
@@ -368,7 +372,7 @@ class TempNode(rclpy.node.Node):
 
 
 
-    def node_value(self, points, r=4, threshold=10):
+    def node_value(self, points, r=4):
         """Assign values to points based on free space around them and spacing."""
 
         if not points or self.map is None:
@@ -386,15 +390,13 @@ class TempNode(rclpy.node.Node):
             y_max = min(50 - 1, point.y + r)
 
 
-            for i in range(x_min, x_max + 1):  # Iterate through square area within bounds
+            count = 0
+            for i in range(x_min, x_max + 1):
                 for j in range(y_min, y_max + 1):
-                    val = self.map.get_cell(i, j)
-                    if val == 0:
-                        point.value += 1 # Increment value for each free cell in range
-                for j in range(y_min, y_max + 1):
-                    val = self.map.get_cell(i, j)
-                    if val == 0:
-                        point.value += 1 # Increment value for each free cell in range
+                    if self.map.get_cell(i, j) == 0:
+                        count += 1
+
+            point.value = count
 
 
         # Finally, sort points by value
