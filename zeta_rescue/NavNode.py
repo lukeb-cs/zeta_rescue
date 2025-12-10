@@ -123,7 +123,7 @@ class TempNode(rclpy.node.Node):
         self.speed = None # Average bot speed: Total distance travelled / time
         self.start_position = None # Return position when finished
         self.position = None # Makes the assumption that the bot starts at 0,0 upon initialization.
-        self.max_time = 300 # Time of test, typcially 5 min. Bot expected to return by this time 
+        self.max_time = 300 # Time of test, typcially 5 min. Bot expected to return by this time
         self.returning = False # Whether the bot's only objective is to return to start.
 
         # Create the action client.
@@ -208,7 +208,7 @@ class TempNode(rclpy.node.Node):
 
     def point_callback(self, point_msg):
         """Process incoming navigation points."""
-        
+
         x = point_msg.point.x
         y = point_msg.point.y
         theta = point_msg.point.z # Assuming z holds orientation in radians
@@ -219,17 +219,17 @@ class TempNode(rclpy.node.Node):
 
 
     def goal_checker_callback(self):
-        if self.start_time is None:
-            self.start_time = time.time()
-        elif (self.returning is False and self.position is not None and self.speed is not None):   
-            # Reccomended by Prof. Molloy: Distance w/ extra
-            # When to return: time left < distance / speed
-            
-            if self.max_time - (time.time() - self.start_time) < math.hypot(self.start_position.x - self.position.x, self.start_position.y - self.position.y) / self.speed:
-                self.returning = True
-                self.ac.destroy()
-                create_nav_goal(self, self.start_position, 0) # Assumes starting angle is irrelevant.
-            
+        # if self.start_time is None:
+        #     self.start_time = time.time()
+        # elif (self.returning is False and self.position is not None and self.speed is not None):
+        #     # Reccomended by Prof. Molloy: Distance w/ extra
+        #     # When to return: time left < distance / speed
+
+        #     if self.max_time - (time.time() - self.start_time) < math.hypot(self.start_position.x - self.position.x, self.start_position.y - self.position.y) / self.speed:
+        #         self.returning = True
+        #         self.ac.destroy()
+        #         create_nav_goal(self, self.start_position, 0) # Assumes starting angle is irrelevant.
+
 
         if self.returning is True:
             return
@@ -266,13 +266,13 @@ class TempNode(rclpy.node.Node):
                 #     self.at_victim = False
                 #     self.rotating = False
 
-                
+
                 self.path.pop()
-                
-                
+
+
                 # self.ac.destroy()
-                
-                
+
+
 
             if self.goal_future.result().status == GoalStatus.STATUS_ABORTED:
                 self.get_logger().info("NAVIGATION SERVER HAS ABORTED. EXITING!")
@@ -302,7 +302,7 @@ class TempNode(rclpy.node.Node):
             self.navigate_to_target(self.path.peek())
             self.get_logger().info("Selecting new target")
             return
- 
+
 
 
     def check_for_detours(self):
@@ -346,7 +346,7 @@ class TempNode(rclpy.node.Node):
 
     def resetGoals(self):
         self.goal_future = None # future for current goal
-        self.cancel_future = None 
+        self.cancel_future = None
         self.future_event == None
 
 
