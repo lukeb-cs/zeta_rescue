@@ -56,27 +56,6 @@ class ZetaNode(rclpy.node.Node):
 
         self.person_list = []
 
-    # def image_interp_callback(self, msg): # may not be used in final version
-    #     img = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-    #     pumpkin_location = self.image_helper(img)
-    #     if pumpkin_location[0] == -1 and pumpkin_location[1] == -1:
-    #         self.get_logger().info(f"No pumpkin found")
-    #     else:
-    #         self.get_logger().info("Orange object located in front of robot")
-    #         if pumpkin_location[1] < 100: # checking if the orange pixel is located at the top of the image
-    #             self.get_logger().info("Orange object is close to the robot")
-
-    # def image_helper(self, img):
-    #     r = img[:, :, 2].astype(np.float32)
-    #     g = img[:, :, 1].astype(np.float32)
-    #     b = img[:, :, 0].astype(np.float32)
-
-    #     orange_score = r - np.abs(g - 0.6 * r) - b * 0.5
-    #     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(orange_score)
-
-    #     if maxVal < 140:            # pumpkin orange generally sits around maxVal = 180
-    #         return (-1, -1)         # lesser oranges have a lower number, around maxVal = 100
-    #     return maxLoc
 
     def pos_callback(self, msg):
         self.x = msg.pose.pose.position.x
@@ -127,7 +106,7 @@ class ZetaNode(rclpy.node.Node):
         front_x = x_loc + change * math.sin(yaw)
         front_y = y_loc + change * math.cos(yaw)
         theta = (yaw + math.pi)
-        theta = (theta + math.pi) % (2 * math.pi) - math.pi
+        theta = (theta + math.pi) % (2 * math.pi)  + (math.pi / 2)
 
         msg = PointStamped()
 
@@ -139,22 +118,7 @@ class ZetaNode(rclpy.node.Node):
 
         self.scanning_code = False
 
-    # def change_motion_callback(self):
-    #     if self.scanning_code:
-    #         return
-    #     dumb_twister = Twist()
-    #     linear_vec = Vector3()
-    #     linear_vec.x = 0.2
-    #     dumb_twister.linear = linear_vec
-    #     angular_vec = Vector3()
-    #     angular_vec.z = random.uniform(-1.0, 1.0)
-    #     dumb_twister.angular = angular_vec
-    #     twister = TwistStamped()
-    #     twister.twist = dumb_twister
 
-    #     self.thrust_pub.publish(twister)
-
-    #     self.get_logger().info("We have changed our motion")
 
 def main():
     rclpy.init()
