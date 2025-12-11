@@ -173,8 +173,8 @@ class TempNode(rclpy.node.Node):
             return
         for p in range (len(self.reported_victims) - self.last_index):
    
-            self.victim_pub.publish(self.reported_victims[p])
-        self.last_index = len(self.reported_victims)
+            self.victim_pub.publish(self.reported_victims[last_index])
+            last_index = last_index + 1
             
             
    
@@ -245,10 +245,6 @@ class TempNode(rclpy.node.Node):
                     if self.latest_victim_pose is None:
                         self.get_logger.warn("No victim position available")
                         return
-
-                    for p in self.reported_victims:
-                        if abs(p.location.pose.position.x - self.latest_victim_pose.pose.position.x) < 0.5:
-                            self.get_logger().warn("Duplicate!")
 
                     filename = f"victim_{int(time.time())}.jpg"
                     filepath = os.path.join(self.save_path, filename)
