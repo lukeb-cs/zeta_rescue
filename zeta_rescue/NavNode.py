@@ -100,14 +100,15 @@ class TempNode(rclpy.node.Node):
     def __init__(self):
         super().__init__('temp_node')
         self.map = None # occupancy grid map
-        self.start_time = None
+        self.start_time = None # Start of navigation goal
+        self.start_move_time = None # Start of program execution
         self.goal_future = None # future for current goal
         self.cancel_future = None # future for goal cancellation
         self.path = Stack() # stack of points to travel to. When empty it draws from points (Use linked list)
         self.points = Stack() # store points in list
         self.point_index = 0 # index for current point in points list
         self.goal = None # current navigation goal for action client
-        self.timeout = 60.0  # 60 seconds timeout per goal
+        self.timeout = 70.0  # 70 seconds timeout per goal Joshua: Adjusted during testing. 70s is better. 
         self.future_event = None
         self.priority_point_value = 1000
 
@@ -116,8 +117,6 @@ class TempNode(rclpy.node.Node):
         self.latest_image = None
         self.reported_victims = [] # list of victims
         self.last_index = 0
-        
-   
 
         self.save_path = os.path.expanduser('~/victim_images')
         os.makedirs(self.save_path, exist_ok=True)
@@ -127,6 +126,7 @@ class TempNode(rclpy.node.Node):
         self.position = None # Makes the assumption that the bot starts at 0,0 upon initialization.
         self.max_time = 300 # Time of test, typcially 5 min. Bot expected to return by this time
         self.returning = False # Whether the bot's only objective is to return to start.
+        self.return_tolerance = 0.75 # Fudge factor for allowing bot to travel back within time.
 
         # Create the action client.
         self.ac = ActionClient(self, NavigateToPose, '/navigate_to_pose')
@@ -197,20 +197,24 @@ class TempNode(rclpy.node.Node):
 
 
     def goal_checker_callback(self):
-        # if self.start_time is None:
-        #     self.start_time = time.time()
-        # elif (self.returning is False and self.position is not None and self.speed is not None):
-        #     # Reccomended by Prof. Molloy: Distance w/ extra
-        #     # When to return: time left < distance / speed
+        if self.start_move_time is None:
+            self.start_move_time = time.time()
+        elif (self.returning is False and self.position is not None and self.speed is not None):
+            # Reccomended by Prof. Molloy: Distance w/ extra
+            # When to return: time left < distance / speed
 
-        #     if self.max_time - (time.time() - self.start_time) < math.hypot(self.start_position.x - self.position.x, self.start_position.y - self.position.y) / self.speed:
-        #         self.returning = True
-        #         self.ac.destroy()
-        #         create_nav_goal(self, self.start_position, 0) # Assumes starting angle is irrelevant.
+            # If time bot has left < expected time to travel back to start.
+            if self.return_tolerance * (self.max_time - (time.time() - self.start_move_time)) < math.hypot(self.start_position.x - self.position.x, self.start_position.y - self.position.y) / self.speed:
+                self.returning = True
+                # self.ac.destroy()
+                # self.create_nav_goal(self.start_position) # Assumes starting angle is irrelevant.
+                self.cancel_future = self.goal_future.result().cancel_goal_async()
+                # self.path.push(self.start_position)
+        self.get_logger().info(f"Path Size: {self.path.size()}, Points Size: {self.points.size()}, Time Elapsed: {int(time.time() - self.start_move_time)}, Returning: {self.returning}")
 
 
-        if self.returning is True:
-            return
+        # if self.returning is True:
+        #     return
 
         """Periodically check in on the progress of navigation."""
         if self.goal_future is None:
@@ -255,7 +259,7 @@ class TempNode(rclpy.node.Node):
 
                     victim.point = self.latest_victim_pose
                     self.reported_victims.append(victim)
-    
+
                 popped_point = self.path.peek()
                 self.get_logger().info(f"Goal succeeded, popping path point ({popped_point.x}, {popped_point.y})")
                 self.path.pop()
@@ -282,13 +286,14 @@ class TempNode(rclpy.node.Node):
             self.get_logger().info("No map available for path planning.")
             return
 
-        if self.points.is_empty(): # No points currently available
-            self.get_logger().info("Generating new points.")
+        if self.points.is_empty() and self.returning is False: # No points currently available
+            # self.get_logger().info("Generating new points.")
             temp_points = self.find_random_valid_points(number_of_nodes=10)
             for p in temp_points:
-                self.get_logger().info(f"New point added to points: ({p.x}, {p.y})")
-
+                self.get_logger().info(f"New point added to points: ({p.x}, {p.y}). There are {self.points.size()} point(s).")
             return
+        elif self.returning is True and self.points.size() < 10:
+            self.points.push(Point(value=10000, x=self.start_position.x, y=self.start_position.y))
 
         if self.path.is_empty(): # No current path, need to plan
             self.path.push(self.points.pop())
@@ -331,8 +336,8 @@ class TempNode(rclpy.node.Node):
             self.position = msg.pose.pose.position
             self.start_position = Point(x = msg.pose.pose.position.x, y = msg.pose.pose.position.y)
         self.distance_travelled = self.distance_travelled + math.hypot(self.position.x - msg.pose.pose.position.x, self.position.y - msg.pose.pose.position.y)
-        if (self.distance_travelled != 0 and self.start_time is not None):
-            self.speed = (self.distance_travelled) / (time.time() - self.start_time)
+        if (self.distance_travelled != 0 and self.start_move_time is not None):
+            self.speed = (self.distance_travelled) / (time.time() - self.start_move_time)
         self.position = Point(x = msg.pose.pose.position.x, y = msg.pose.pose.position.y)
 
     # -------------------- planning utilities --------------------
